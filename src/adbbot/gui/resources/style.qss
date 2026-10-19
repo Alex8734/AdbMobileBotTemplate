@@ -1,0 +1,42 @@
+/* AdbBot – dunkles Theme (ergänzt die Fusion-Palette aus gui/app.py) */
+
+QToolBar {
+    spacing: 4px;
+    padding: 3px;
+    border: none;
+}
+
+QDockWidget::title {
+    padding: 5px 8px;
+    background: #2b2d34;
+}
+
+QPlainTextEdit#debugLog {
+    background: #16171b;
+    border: none;
+}
+
+QTreeWidget#timeline {
+    background: #1c1d22;
+    border: none;
+}
+
+QLabel#flowHeader {
+    font-weight: bold;
+    padding: 4px 2px;
+}
+
+QLabel#viewInfo {
+    color: #9aa0aa;
+    padding: 2px 6px;
+}
+
+QToolButton#sectionHeader {
+    border: none;
+    font-weight: bold;
+    padding: 4px 2px;
+}
+
+QStatusBar QLabel {
+    padding: 0 8px;
+}

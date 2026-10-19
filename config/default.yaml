@@ -1,0 +1,20 @@
+# Framework-Defaults. Profile in config/profiles/ überschreiben einzelne Werte.
+# Alle Felder und Standardwerte: src/adbbot/core/config.py
+
+log_level: INFO
+
+device:
+  backend: adb
+  command_timeout_s: 10.0
+  connect_attempts: 3
+  reference_resolution: [1080, 1920]
+
+vision:
+  default_threshold: 0.85
+  poll_interval_ms: 300
+
+bot:
+  step_timeout_s: 30.0
+  default_retries: 1
+  humanize_input: true
+  post_tap_delay_ms: [150, 400]

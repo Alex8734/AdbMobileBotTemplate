@@ -1,0 +1,8 @@
+# Beispielprofil: `mybot --profile example`
+app:
+  package: com.example.app
+
+device:
+  serial: null        # null = erstes gefundenes Gerät, z. B. emulator-5554 oder 192.168.0.10:5555
+  backend: adb        # adb | fake
+  # fake_screens_dir: tests/fixtures/screens

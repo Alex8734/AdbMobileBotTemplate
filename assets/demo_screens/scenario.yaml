@@ -1,0 +1,17 @@
+# Erzeugt von scripts/make_demo_assets.py – Übergänge des Fake-Geräts (Screen-Pixel)
+start: home
+start_app: home
+transitions:
+  home:
+    - {tap: [380, 160, 110, 110], goto: gift_popup}
+    - {tap: [170, 560, 200, 80], goto: shop}
+  home_no_gift:
+    - {tap: [170, 560, 200, 80], goto: shop}
+  gift_popup:
+    - {tap: [170, 540, 200, 80], goto: rating_popup}
+  rating_popup:
+    - {tap: [170, 560, 200, 70], goto: home_no_gift}
+  shop:
+    - {tap: [472, 22, 48, 48], goto: "@back"}
+  "*":
+    - {key: 4, goto: "@back"}

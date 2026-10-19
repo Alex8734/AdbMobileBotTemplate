@@ -1,0 +1,13 @@
+# Demo ohne Handy: uv run mybot --headless --profile demo --flow daily
+# Screens + Szenario: assets/demo_screens (erzeugt mit scripts/make_demo_assets.py)
+app:
+  package: com.example.demo
+
+device:
+  backend: fake
+  fake_screens_dir: assets/demo_screens
+  reference_resolution: [540, 960]
+
+bot:
+  watcher_interval_ms: 300
+  post_tap_delay_ms: [50, 150]
