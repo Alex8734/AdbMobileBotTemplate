@@ -61,6 +61,7 @@ data/                   Laufzeitdaten: failures/, screenshots/, <profil>/state.j
 |---|---|
 | `uv run python scripts/test_template.py shot.png home/shop_button` | Template gegen einen Screenshot testen, Ergebnisbild mit Overlays |
 | `uv run python scripts/capture_screenshots.py --on-change --out DIR` | Screenshot-Serie aufnehmen (Fake-Screens, Template-Quellen) |
+| `uv run python scripts/capture_ads.py --profile P` | Werbung nebenher aufzeichnen (Screens, Activities, Schließen-Buttons) nach `data/ads/` |
 | `uv run python scripts/make_demo_assets.py` | Demo-Screens und -Templates des Beispielprojekts neu erzeugen |
 | GUI → **Template aufnehmen** | Bereich im Livebild aufziehen und direkt als Template speichern |
 

@@ -117,6 +117,7 @@ class MainWindow(QMainWindow):
         self.debug_panel = DebugPanel(max_lines=config.gui.max_log_lines)
         self.flow_panel = FlowPanel([(cls.name, cls.description) for cls in registries.flows.classes()])
         self.action_panel = ActionPanel(registries.actions.groups())
+        self.addActions(self.action_panel.shortcut_actions)
         self.device_panel = DevicePanel(config.device.backend, device_lister)
         self.status = BotStatusBar()
         self.setStatusBar(self.status)

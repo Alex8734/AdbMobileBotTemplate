@@ -21,7 +21,7 @@ def test_example_project_registration() -> None:
     assert reg.flows.names() == ["daily", "shop"]
     assert reg.pages.names() == ["home", "shop"]
     assert [w.title for w in reg.watchers] == ["Bewertungs-Popup"]
-    assert reg.actions.names() == ["save_screenshot", "debug_views", "test_shop"]
+    assert reg.actions.names() == ["save_screenshot", "debug_views", "test_shop", "test_dismiss_ad"]
     assert list(reg.actions.groups()) == ["Debug", "Test"]
     assert reg.actions.get("save_screenshot").description.startswith("Aktuellen Bildschirm")
 

@@ -4,7 +4,7 @@
   denn dann liest der Bot-Thread die Queue nicht. Stop verwirft zusätzlich alle wartenden Arbeits-Commands.
 - Arbeits-Commands (StartFlow, RunAction, TapAt, ...) werden sequenziell abgearbeitet.
 - Ohne Arbeit: Idle-Tick (Reconnect mit Backoff, optional Livebild + Idle-Watcher).
-- `vision.poll_hook` → `checkpoint()` + Watcher auf jedem Frame der Warteschleifen.
+- `vision.poll_hook` → `checkpoint()` + Vordergrund-Wächter + Watcher auf jedem Frame der Warteschleifen.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from collections.abc import Callable
 
 from adbbot.bot.context import BotContext
 from adbbot.bot.failure import mark_reported, was_reported
+from adbbot.bot.foreground import ForegroundGuard
 from adbbot.bot.registry import Registries
 from adbbot.bot.watchers import WatcherRunner
 from adbbot.core.commands import (
@@ -49,6 +50,15 @@ class BotEngine:
             registries.watchers,
             interval_s=bot.watcher_interval_ms / 1000,
             max_triggers_per_step=bot.watcher_max_triggers_per_step,
+        )
+        self.foreground = (
+            ForegroundGuard(
+                ctx,
+                interval_s=bot.foreground_check_interval_ms / 1000,
+                max_triggers_per_step=bot.watcher_max_triggers_per_step,
+            )
+            if bot.foreground_guard
+            else None
         )
         self._idle_frames = idle_frames and bot.idle_frame_interval_ms > 0
         device = ctx.config.device
@@ -130,6 +140,8 @@ class BotEngine:
         self._drain()
         self._queue.put(None)
         self.watchers.close()
+        if self.foreground is not None:
+            self.foreground.close()
         if self._thread is None:
             return True
         self._thread.join(timeout)
@@ -199,6 +211,8 @@ class BotEngine:
         control = self.ctx.control
         control.reset()
         self.watchers.reset()
+        if self.foreground is not None:
+            self.foreground.reset()
         if not self._ensure_connected():
             self._reject(name, "Kein Gerät verbunden")
             return
@@ -345,8 +359,11 @@ class BotEngine:
 
     def _on_poll(self, frame: Frame) -> None:
         self.ctx.checkpoint()
-        if self.current_job is not None:
-            self.watchers.run(frame, flow_running=True)
+        if self.current_job is None:
+            return
+        if self.foreground is not None and self.foreground.run():
+            return  # Frame zeigt noch die fremde App
+        self.watchers.run(frame, flow_running=True)
 
     def _on_pause_changed(self, paused: bool) -> None:
         if self.current_job is None:

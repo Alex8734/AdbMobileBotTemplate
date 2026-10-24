@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Sequence
+from collections import Counter
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
@@ -41,6 +43,7 @@ class BotContext:
     rng: random.Random = field(default_factory=random.Random)
     failures: FailureRecorder | None = None
     store: Storage = field(default_factory=Storage.in_memory)  # persistenter Key-Value-Store pro Profil
+    _suspended: Counter[str] = field(default_factory=Counter, init=False, repr=False)
 
     @cached_property
     def navigator(self) -> Navigator:
@@ -54,6 +57,18 @@ class BotContext:
     def sleep(self, seconds: float) -> None:
         """Schlafen in 100-ms-Schritten, jeder mit `checkpoint()` – Stop wirkt sofort."""
         self.control.sleep(seconds)
+
+    @contextmanager
+    def suspend_watchers(self, *groups: str) -> Iterator[None]:
+        """Watcher dieser Gruppen (auch den Vordergrund-Wächter: `"foreground"`) im Block nicht prüfen."""
+        self._suspended.update(groups)
+        try:
+            yield
+        finally:
+            self._suspended.subtract(groups)
+
+    def watchers_suspended(self, group: str) -> bool:
+        return self._suspended[group] > 0
 
     def page[P: Page](self, cls: type[P]) -> P:
         """Typsicher: `ctx.page(HomePage)` → `HomePage`."""

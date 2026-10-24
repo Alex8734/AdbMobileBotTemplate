@@ -111,3 +111,40 @@ def test_from_dir_loads_scenario(tmp_path: Path, screens: dict[str, Image]) -> N
     (tmp_path / "scenario.yaml").write_text("start: [kaputt", encoding="utf-8")
     with pytest.raises(ConfigError, match="YAML"):
         FakeDevice.from_dir(tmp_path)
+
+
+def test_transition_switches_app_and_bring_to_front_returns(
+    fake_clock: FakeClock, screens: dict[str, Image]
+) -> None:
+    scenario = FakeScenario.from_dict(
+        {
+            "start": "home",
+            "transitions": {
+                "home": [{"tap": [0, 0, 10, 10], "goto": "shop"}],
+                "shop": [{"tap": [0, 0, 10, 10], "goto": "popup", "app": "com.android.vending"}],
+                "popup": [{"tap": [0, 0, 10, 10], "goto": "home", "activity": "com.vending.Details"}],
+            },
+        }
+    )
+    d = FakeDevice(screens, clock=fake_clock, scenario=scenario, current_package="com.game")
+    d.connect()
+    d.tap(Point(5, 5))
+    d.tap(Point(5, 5))  # Werbung → Play Store
+    assert (d.current_screen, d.current_app(), d.current_activity()) == ("popup", "com.android.vending", None)
+    d.tap(Point(5, 5))  # innerhalb des Stores weiter, App bleibt
+    assert (d.current_app(), d.current_activity()) == ("com.android.vending", "com.vending.Details")
+
+    d.bring_to_front("com.game")
+    assert (d.current_screen, d.current_app(), d.current_activity()) == ("shop", "com.game", None)
+    d.bring_to_front("com.game")  # schon vorne: nichts passiert
+    assert d.current_screen == "shop"
+    assert [r.kind for r in d.inputs][-2:] == ["bring_to_front", "bring_to_front"]
+
+
+def test_bring_to_front_starts_app_when_not_running(fake_clock: FakeClock, screens: dict[str, Image]) -> None:
+    d = FakeDevice(
+        screens, clock=fake_clock, scenario=FakeScenario.from_dict({"start": "shop", "start_app": "home"})
+    )
+    d.connect()
+    d.bring_to_front("com.game")
+    assert (d.current_screen, d.current_app()) == ("home", "com.game")

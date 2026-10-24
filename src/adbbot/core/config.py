@@ -30,6 +30,7 @@ class TargetAppConfig(_Model):
     activity: str | None = None
     restart_if_not_running: bool = True
     start_timeout_s: float = 30.0  # so lange darf der App-Start dauern
+    foreground_allowlist: list[str] = Field(default_factory=list)  # fremde Packages, die der Wächter duldet
 
 
 class DeviceConfig(_Model):
@@ -62,6 +63,8 @@ class BotConfig(_Model):
     post_tap_delay_ms: tuple[int, int] = (150, 400)
     watcher_interval_ms: int = 1000
     watcher_max_triggers_per_step: int = 5
+    foreground_guard: bool = True  # App zurückholen, wenn sie während eines Flows den Vordergrund verliert
+    foreground_check_interval_ms: int = Field(default=2000, ge=0)  # eigener adb-Aufruf → nicht pro Frame
     idle_frame_interval_ms: int = 500  # Livebild ohne laufenden Flow (0 = aus)
     failure_snapshots: bool = True
     persist_state: bool = True  # ctx.store nach data/<profil>/state.json schreiben (false = nur im Speicher)

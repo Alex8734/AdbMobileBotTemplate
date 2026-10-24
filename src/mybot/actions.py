@@ -1,12 +1,15 @@
 """Projektspezifische GUI-Buttons."""
 
+from contextlib import nullcontext
 from datetime import datetime
 
 import cv2
 
 from adbbot.bot.actions import action
 from adbbot.bot.context import BotContext
+from adbbot.bot.foreground import FOREGROUND_GROUP
 from adbbot.utils.paths import screenshots_dir
+from mybot.ads import dismiss_ad
 from mybot.pages.home_page import HomePage
 
 
@@ -34,3 +37,20 @@ def debug_views(ctx: BotContext) -> None:
 def test_shop(ctx: BotContext) -> None:
     """Von der Startseite in den Shop wechseln."""
     ctx.page(HomePage).open_shop()
+
+
+@action("Werbung wegdrücken (Test)", group="Test", shortcut="F8")
+def test_dismiss_ad(ctx: BotContext) -> None:
+    """Die gerade offene Werbung wegdrücken – X, ▶|/⏭ oder aufs Display tippen (mybot/ads.py)."""
+    log = ctx.log.bind(source="action")
+    current, package = ctx.device.current_app(), ctx.config.app.package
+    log.info("Werbung wegdrücken", app=current, activity=ctx.device.current_activity())
+    # Stimmt app.package im Profil nicht, würde der Vordergrund-Wächter die falsche App holen
+    guard_off = current is not None and current != package
+    if guard_off:
+        log.warning(
+            "app.package im Profil passt nicht zur offenen App – Vordergrund-Wächter aus", profil=package
+        )
+    with ctx.suspend_watchers(FOREGROUND_GROUP) if guard_off else nullcontext():
+        closed = dismiss_ad(ctx)
+    log.info("Ergebnis", geschlossen=closed, app=ctx.device.current_app())

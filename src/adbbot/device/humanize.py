@@ -90,6 +90,15 @@ class HumanizedDevice:
     def current_app(self) -> str | None:
         return self.inner.current_app()
 
+    def current_activity(self) -> str | None:
+        return self.inner.current_activity()
+
+    def bring_to_front(self, package: str) -> None:
+        self.inner.bring_to_front(package)
+
+    def dump_ui(self) -> str | None:
+        return self.inner.dump_ui()
+
     # --- intern ------------------------------------------------------------------------------------
 
     def _jitter(self, p: Point, px: int) -> Point:

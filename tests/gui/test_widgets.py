@@ -157,7 +157,7 @@ def test_action_panel(qtbot: QtBot) -> None:
 
     groups = {
         "Debug": [ActionSpec("Screenshot", screenshot, "Debug", "Bild speichern")],
-        "Test": [ActionSpec("Shop", shop, "Test")],
+        "Test": [ActionSpec("Shop", shop, "Test", shortcut="F8")],
     }
     panel = ActionPanel(groups)  # type: ignore[arg-type]
     qtbot.addWidget(panel)
@@ -168,7 +168,11 @@ def test_action_panel(qtbot: QtBot) -> None:
     qtbot.mouseClick(panel.button("screenshot"), Qt.MouseButton.LeftButton)
     assert requested == ["shop", "screenshot"]
     assert panel.button("screenshot").toolTip() == "Bild speichern"
-    assert panel.button("shop").toolTip() == "shop"
+    assert panel.button("shop").toolTip() == "shop [F8]"
+    assert panel.button("shop").text() == "Shop  (F8)"
+    assert [a.shortcut().toString() for a in panel.shortcut_actions] == ["F8"]
+    panel.shortcut_actions[0].trigger()
+    assert requested[-1] == "shop"
 
     section = panel.sections["Debug"]
     section.set_expanded(False)
@@ -178,6 +182,7 @@ def test_action_panel(qtbot: QtBot) -> None:
     panel.set_busy(True)
     assert not panel.button("screenshot").isEnabled()
     assert not panel.button("shop").isEnabled()
+    assert not panel.shortcut_actions[0].isEnabled()
 
 
 def test_device_panel(qtbot: QtBot) -> None:

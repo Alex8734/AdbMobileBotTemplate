@@ -1,6 +1,6 @@
 """Actions: Funktionen, die in der GUI als Buttons erscheinen (und per `RunAction` startbar sind).
 
-    @action("Screenshot speichern", group="Debug")
+    @action("Screenshot speichern", group="Debug", shortcut="Ctrl+S")
     def save_screenshot(ctx: BotContext) -> None:
         ...
 
@@ -27,6 +27,7 @@ class ActionSpec:
     func: ActionFunc
     group: str = "Allgemein"
     description: str = ""
+    shortcut: str | None = None  # Tastenkürzel in der GUI (Qt-Schreibweise, z. B. "F8", "Ctrl+Shift+A")
 
     @property
     def name(self) -> str:
@@ -35,11 +36,12 @@ class ActionSpec:
 
 
 def action(
-    title: str, *, group: str = "Allgemein", description: str = ""
+    title: str, *, group: str = "Allgemein", description: str = "", shortcut: str | None = None
 ) -> Callable[[ActionFunc], ActionFunc]:
     def decorate(func: ActionFunc) -> ActionFunc:
         doc = (getattr(func, "__doc__", None) or "").strip().splitlines()
-        setattr(func, ACTION_ATTR, ActionSpec(title, func, group, description or (doc[0] if doc else "")))
+        spec = ActionSpec(title, func, group, description or (doc[0] if doc else ""), shortcut)
+        setattr(func, ACTION_ATTR, spec)
         return func
 
     return decorate

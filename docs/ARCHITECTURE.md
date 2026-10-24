@@ -205,6 +205,7 @@ AdbBotTemplate/
 │
 ├── scripts/
 │   ├── capture_screenshots.py       ← Screenshot-Serie für FakeDevice aufnehmen
+│   ├── capture_ads.py               ← Werbung aufzeichnen (Activity-Erkennung, UI-Dump)
 │   └── test_template.py             ← Ein Template gegen einen Screenshot testen (CLI, mit Bildausgabe)
 │
 └── tests/
@@ -353,6 +354,8 @@ class BotConfig(BaseModel):
     post_tap_delay_ms: tuple[int, int] = (150, 400)
     watcher_interval_ms: int = 1000             # Watcher höchstens so oft prüfen
     watcher_max_triggers_per_step: int = 5
+    foreground_guard: bool = True               # App zurückholen, wenn sie den Vordergrund verliert
+    foreground_check_interval_ms: int = 2000    # current_app() ist ein eigener adb-Aufruf
     idle_frame_interval_ms: int = 500           # Livebild ohne laufenden Flow (0 = aus)
     failure_snapshots: bool = True
 
@@ -494,6 +497,9 @@ class DeviceProtocol(Protocol):
     def start_app(self, package: str, activity: str | None = None) -> None
     def stop_app(self, package: str) -> None
     def current_app(self) -> str | None
+    def current_activity(self) -> str | None       # z. B. com.google.android.gms.ads.AdActivity
+    def bring_to_front(self, package: str) -> None  # bestehenden Task nach vorne, kein Neustart
+    def dump_ui(self) -> str | None                # uiautomator-XML, langsam; None bei Fehlschlag
 ```
 
 - **`AdbDevice`** (adbutils). Jeder Aufruf hat ein Timeout (`command_timeout_s`) und wirft `DeviceError`,
@@ -768,7 +774,27 @@ def dismiss_rating(ctx: BotContext, match: Match) -> None:
   (sonst Rekursion, wenn der Handler selbst `wait_for` benutzt);
 - zählt Auslösungen pro Step; ab `watcher_max_triggers_per_step` wird `WatcherLoop` geworfen
   (ein Popup, das nie verschwindet, darf nicht zur Endlosschleife werden);
-- publiziert `WatcherTriggered` und loggt mit `source=watcher`.
+- publiziert `WatcherTriggered` und loggt mit `source=watcher`;
+- überspringt Watcher, deren `group` gerade pausiert ist. Beispiel: Der Bot startet selbst eine
+  Bonus-Werbung, die bis zum Ende laufen muss. Der Werbe-Watcher (`group="ads"`) darf sie nicht schließen:
+
+  ```python
+  with ctx.suspend_watchers("ads"):
+      ...  # Werbung abwarten
+  ```
+
+#### Vordergrund-Wächter – App zurückholen
+
+Ein Tap auf eine Werbung öffnet oft den Play Store oder den Browser. Dort finden Template-Watcher nichts.
+`ForegroundGuard` (`bot/foreground.py`) läuft deshalb im `poll_hook` vor den Watchern, solange ein Flow läuft:
+
+- prüft höchstens alle `foreground_check_interval_ms` per `device.current_app()`;
+- ist eine fremde App vorne (nicht `app.package`, nicht in `app.foreground_allowlist`, nicht `None` wie beim
+  Sperrbildschirm), holt `device.bring_to_front()` den **bestehenden** Task per Launcher-Intent zurück
+  (kein Neustart, Spielstand bleibt) und wartet bis `app.start_timeout_s`, sonst `StepFailed`;
+- zählt wie der `WatcherRunner` pro Step mit (`WatcherLoop`), publiziert `WatcherTriggered("App im Vordergrund")`;
+- lässt sich pro Block mit `ctx.suspend_watchers("foreground")` abschalten, z. B. für einen Flow, der absichtlich
+  die Systemeinstellungen öffnet.
 
 #### Actions – GUI-Buttons aus Code
 

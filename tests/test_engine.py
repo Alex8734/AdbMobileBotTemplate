@@ -19,6 +19,7 @@ from adbbot.core.events import FlowFinished, FlowStarted, RegistriesChanged, Sta
 from adbbot.core.exceptions import DeviceError
 from adbbot.core.state import BotState
 from adbbot.core.types import Match, Point, StepResult
+from adbbot.device.fake_device import FakeScenario
 from tests.botkit import EventLog, fake, make_context
 from tests.imagegen import paste, textured
 
@@ -229,3 +230,25 @@ def test_shutdown(world: World) -> None:
     assert engine.shutdown()
     assert not engine.is_alive
     world.engine = None
+
+
+class TapIntoStore(Flow):
+    """Tippt versehentlich auf eine Werbung, die den Play Store öffnet, und wartet danach auf den Button."""
+
+    def run(self) -> None:
+        self.device.tap(Point(5, 5))
+        self.wait_for("home/button", timeout=2)
+
+
+def test_foreground_guard_brings_app_back(world: World) -> None:
+    device = fake(world.ctx)
+    device.scenario = FakeScenario.from_dict(
+        {"transitions": {"home": [{"tap": [0, 0, 10, 10], "goto": "empty", "app": "com.android.vending"}]}}
+    )
+    device.current_package = "com.example.test"
+    world.reg.flows.register(TapIntoStore)
+    world.start().submit(StartFlow("tap_into_store"))
+
+    assert world.finished()[0].result is StepResult.OK
+    assert device.current_app() == "com.example.test"
+    assert "App im Vordergrund" in [e.watcher for e in world.events.of(WatcherTriggered)]

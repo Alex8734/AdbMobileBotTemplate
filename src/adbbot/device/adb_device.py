@@ -154,6 +154,10 @@ class AdbDevice:
     def stop_app(self, package: str) -> None:
         self._shell(["am", "force-stop", package])
 
+    def bring_to_front(self, package: str) -> None:
+        """Launcher-Intent: holt den bestehenden Task nach vorne, statt eine neue Activity zu erzeugen."""
+        self._shell(["monkey", "-p", package, "-c", "android.intent.category.LAUNCHER", "1"])
+
     def current_app(self) -> str | None:
         dev = self._require()
         try:
@@ -162,6 +166,31 @@ class AdbDevice:
             if not self.is_connected():
                 raise DeviceError(f"Aktuelle App nicht lesbar: {e}") from e
             return None  # z. B. Sperrbildschirm: keine fokussierte App
+
+    def current_activity(self) -> str | None:
+        """Vollständiger Klassenname, z. B. `com.google.android.gms.ads.AdActivity`."""
+        dev = self._require()
+        try:
+            info = dev.app_current()
+        except _ADB_ERRORS as e:
+            if not self.is_connected():
+                raise DeviceError(f"Aktuelle Activity nicht lesbar: {e}") from e
+            return None
+        activity = str(info.activity or "")
+        if activity.startswith("."):  # relativ zum Package
+            activity = f"{info.package}{activity}"
+        return activity or None
+
+    def dump_ui(self) -> str | None:
+        """UI-Hierarchie als XML (`uiautomator dump`). Langsam (1–3 s); `None`, wenn der Dump scheitert –
+        etwa während ein Video läuft und die UI nie „idle“ wird."""
+        dev = self._require()
+        try:
+            return str(dev.dump_hierarchy())
+        except _ADB_ERRORS as e:
+            if not self.is_connected():
+                raise DeviceError(f"UI-Dump nicht möglich: {e}") from e
+            return None
 
     # --- intern ------------------------------------------------------------------------------------
 

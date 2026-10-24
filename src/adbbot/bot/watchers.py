@@ -4,6 +4,11 @@
     def dismiss_rating(ctx: BotContext, match: Match) -> None:
         ctx.device.tap(match.rect.center)
 
+Watcher mit `group` lassen sich zeitweise abschalten, z. B. während der Bot selbst eine Werbung schaut:
+
+    with ctx.suspend_watchers("ads"):
+        ...
+
 Die Engine prüft sie über `vision.poll_hook` auf jedem Frame der Warteschleifen – ohne Extra-Screenshot.
 """
 
@@ -35,6 +40,7 @@ class WatcherSpec:
     priority: int = 0  # höher = zuerst
     cooldown_s: float = 2.0  # frühestens nach dieser Zeit erneut auslösen
     idle: bool = False  # auch ohne laufenden Flow prüfen (braucht Idle-Livebild)
+    group: str | None = None  # über `ctx.suspend_watchers(group)` abschaltbar
 
     @property
     def key(self) -> str:
@@ -50,13 +56,14 @@ def watcher(
     priority: int = 0,
     cooldown_s: float = 2.0,
     idle: bool = False,
+    group: str | None = None,
 ) -> Callable[[WatcherFunc], WatcherFunc]:
     templates = (template,) if isinstance(template, str) else tuple(template)
     if not templates:
         raise ValueError("Watcher braucht mindestens ein Template")
 
     def decorate(func: WatcherFunc) -> WatcherFunc:
-        spec = WatcherSpec(title, func, templates, region, threshold, priority, cooldown_s, idle)
+        spec = WatcherSpec(title, func, templates, region, threshold, priority, cooldown_s, idle, group)
         setattr(func, WATCHER_ATTR, spec)
         return func
 
@@ -117,6 +124,8 @@ class WatcherRunner:
 
         for spec in self.specs:
             if not (flow_running or spec.idle):
+                continue
+            if spec.group is not None and self.ctx.watchers_suspended(spec.group):
                 continue
             last = self._last_trigger.get(spec.key)
             if last is not None and now - last < spec.cooldown_s:

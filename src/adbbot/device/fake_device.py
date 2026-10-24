@@ -17,6 +17,12 @@ Szenario (`scenario.yaml` im Screen-Ordner): ein kleiner Zustandsautomat, z. B.
         - {tap: [472, 22, 48, 48], goto: "@back"}  # zurück zum vorherigen Screen
       "*":
         - {key: 4, goto: "@back"}                  # gilt auf jedem Screen
+
+Ein Übergang kann zusätzlich die Vordergrund-App bzw. Activity setzen, z. B. Tap auf Werbung → Play Store:
+
+        - {tap: [0, 0, 360, 640], goto: store, app: com.android.vending}
+
+`bring_to_front()` kehrt danach auf den Screen zurück, von dem aus die App verlassen wurde.
 """
 
 from __future__ import annotations
@@ -41,7 +47,7 @@ SCENARIO_FILE = "scenario.yaml"
 
 @dataclass(frozen=True, slots=True)
 class InputRecord:
-    kind: str  # "tap", "swipe", "long_press", "key", "text", "start_app", "stop_app"
+    kind: str  # "tap", "swipe", "long_press", "key", "text", "start_app", "stop_app", "bring_to_front"
     args: tuple[Any, ...]
 
 
@@ -54,6 +60,8 @@ class _TransitionModel(BaseModel):
     tap: tuple[int, int, int, int] | None = None
     key: int | None = None
     goto: str
+    app: str | None = None  # Vordergrund-App nach dem Übergang
+    activity: str | None = None
 
     @model_validator(mode="after")
     def _exactly_one_trigger(self) -> _TransitionModel:
@@ -75,6 +83,8 @@ class Transition:
     goto: str
     tap: Rect | None = None
     key: int | None = None
+    app: str | None = None
+    activity: str | None = None
 
     def matches(self, record: InputRecord) -> bool:
         if self.tap is not None:
@@ -95,7 +105,9 @@ class FakeScenario:
         except ValidationError as e:
             raise ConfigError(f"{source}: ungültiges Szenario: {e}") from e
         transitions = {
-            screen: tuple(Transition(t.goto, Rect(*t.tap) if t.tap else None, t.key) for t in items)
+            screen: tuple(
+                Transition(t.goto, Rect(*t.tap) if t.tap else None, t.key, t.app, t.activity) for t in items
+            )
             for screen, items in model.transitions.items()
         }
         return cls(transitions, model.start, model.start_app)
@@ -117,10 +129,10 @@ class FakeScenario:
         names.update(t.goto for items in self.transitions.values() for t in items if t.goto != BACK)
         return names
 
-    def target(self, screen: str, record: InputRecord) -> str | None:
+    def target(self, screen: str, record: InputRecord) -> Transition | None:
         for transition in (*self.transitions.get(screen, ()), *self.transitions.get(ANY_SCREEN, ())):
             if transition.matches(record):
-                return transition.goto
+                return transition
         return None
 
 
@@ -137,6 +149,7 @@ class FakeDevice:
         mode: Literal["sequential", "manual"] = "sequential",
         loop: bool = False,
         current_package: str | None = None,
+        current_activity: str | None = None,
         on_input: Callable[[FakeDevice, InputRecord], None] | None = None,
         scenario: FakeScenario | None = None,
     ) -> None:
@@ -154,6 +167,9 @@ class FakeDevice:
         self.mode = mode
         self.loop = loop
         self.current_package = current_package
+        self.activity = current_activity
+        self.ui_xml: str | None = None  # Ergebnis von dump_ui()
+        self._resume_screen: str | None = None  # Screen, von dem aus die App verlassen wurde
         self.on_input = on_input
         self.scenario = scenario
         self.inputs: list[InputRecord] = []
@@ -259,6 +275,8 @@ class FakeDevice:
     def start_app(self, package: str, activity: str | None = None) -> None:
         self._record("start_app", package, activity)
         self.current_package = package
+        self.activity = activity
+        self._resume_screen = None
         if self.scenario is not None and self.scenario.start_app:
             self._history.clear()
             self._set_screen(self.scenario.start_app)
@@ -267,10 +285,32 @@ class FakeDevice:
         self._record("stop_app", package)
         if self.current_package == package:
             self.current_package = None
+            self.activity = None
+
+    def bring_to_front(self, package: str) -> None:
+        self._record("bring_to_front", package)
+        if self.current_package == package:
+            return
+        self.current_package = package
+        self.activity = None
+        if self._resume_screen is not None:
+            self._set_screen(self._resume_screen)
+            self._resume_screen = None
+        elif self.scenario is not None and self.scenario.start_app:
+            self._history.clear()
+            self._set_screen(self.scenario.start_app)
 
     def current_app(self) -> str | None:
         self._check()
         return self.current_package
+
+    def current_activity(self) -> str | None:
+        self._check()
+        return self.activity
+
+    def dump_ui(self) -> str | None:
+        self._check()
+        return self.ui_xml
 
     # --- intern ------------------------------------------------------------------------------------
 
@@ -287,6 +327,16 @@ class FakeDevice:
         self._history.append(self.current_screen)
         self._set_screen(target)
 
+    def _apply(self, transition: Transition) -> None:
+        if transition.app is not None and transition.app != self.current_package:
+            if self._resume_screen is None:
+                self._resume_screen = self.current_screen
+            self.current_package = transition.app
+            self.activity = None
+        if transition.activity is not None:
+            self.activity = transition.activity
+        self._go(transition.goto)
+
     def _raise_pending(self) -> None:
         if self._pending_error is not None:
             error, self._pending_error = self._pending_error, None
@@ -302,8 +352,8 @@ class FakeDevice:
         record = InputRecord(kind, args)
         self.inputs.append(record)
         if self.scenario is not None:
-            target = self.scenario.target(self.current_screen, record)
-            if target is not None:
-                self._go(target)
+            transition = self.scenario.target(self.current_screen, record)
+            if transition is not None:
+                self._apply(transition)
         if self.on_input is not None:
             self.on_input(self, record)

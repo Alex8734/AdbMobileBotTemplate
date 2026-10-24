@@ -153,3 +153,16 @@ def test_watcher_clears_popup_during_wait(ctx: BotContext) -> None:
     assert flow.params["match"].rect == Rect(100, 300, 60, 40)
     assert fake(ctx).current_screen == "clean"
     assert [rec.kind for rec in fake(ctx).inputs] == ["tap"]
+
+
+def test_group_can_be_suspended(ctx: BotContext) -> None:
+    calls: list[str] = []
+    r = runner(ctx, make_spec("ad", calls, group="ads"))
+    frame = ctx.vision.capture()
+    with ctx.suspend_watchers("ads"):
+        with ctx.suspend_watchers("ads"):  # verschachtelt
+            assert not r.run(frame, flow_running=True)
+        assert not r.run(frame, flow_running=True)
+    assert calls == []
+    assert r.run(frame, flow_running=True)
+    assert calls == ["ad"]

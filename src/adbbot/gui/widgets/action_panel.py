@@ -1,10 +1,15 @@
-"""ActionPanel: Buttons aus der ActionRegistry, gruppiert in aufklappbaren Abschnitten."""
+"""ActionPanel: Buttons aus der ActionRegistry, gruppiert in aufklappbaren Abschnitten.
+
+Actions mit `shortcut` bekommen zusätzlich eine `QAction` (`shortcut_actions`). Das Hauptfenster hängt sie bei
+sich ein, damit das Kürzel auch bei zugeklapptem oder geschlossenem Panel wirkt.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QLabel, QPushButton, QToolButton, QVBoxLayout, QWidget
 
 from adbbot.bot.actions import ActionSpec
@@ -51,6 +56,7 @@ class ActionPanel(QWidget):
         super().__init__(parent)
         self.sections: dict[str, CollapsibleSection] = {}
         self._buttons: dict[str, QPushButton] = {}
+        self.shortcut_actions: list[QAction] = []
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         if not groups:
@@ -59,7 +65,12 @@ class ActionPanel(QWidget):
             section = CollapsibleSection(group)
             for spec in specs:
                 button = QPushButton(spec.title)
-                button.setToolTip(spec.description or spec.name)
+                tip = spec.description or spec.name
+                if spec.shortcut:
+                    button.setText(f"{spec.title}  ({spec.shortcut})")
+                    tip = f"{tip} [{spec.shortcut}]"
+                    self.shortcut_actions.append(self._shortcut_action(spec, spec.shortcut))
+                button.setToolTip(tip)
                 button.clicked.connect(
                     lambda _checked=False, name=spec.name: self.action_requested.emit(name)
                 )
@@ -69,9 +80,18 @@ class ActionPanel(QWidget):
             self.sections[group] = section
         layout.addStretch(1)
 
+    def _shortcut_action(self, spec: ActionSpec, shortcut: str) -> QAction:
+        act = QAction(spec.title, self)
+        act.setShortcut(QKeySequence(shortcut))
+        act.setShortcutContext(Qt.ShortcutContext.WindowShortcut)
+        act.triggered.connect(lambda _checked=False, name=spec.name: self.action_requested.emit(name))
+        return act
+
     def button(self, name: str) -> QPushButton:
         return self._buttons[name]
 
     def set_busy(self, busy: bool) -> None:
         for button in self._buttons.values():
             button.setEnabled(not busy)
+        for act in self.shortcut_actions:
+            act.setEnabled(not busy)
