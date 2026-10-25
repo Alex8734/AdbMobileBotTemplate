@@ -33,36 +33,10 @@ from adbbot.core.clock import Clock, RealClock
 from adbbot.core.config import deep_merge, load_config, parse_assignment
 from adbbot.core.exceptions import BotError
 from adbbot.core.types import Frame, Image
+from adbbot.device.activities import is_ad_activity
 from adbbot.device.discovery import connect_with_retry, create_device
 from adbbot.device.protocol import DeviceProtocol
 from adbbot.utils import paths
-
-# Activities bekannter Werbe-SDKs (Teilstrings, ohne Groß-/Kleinschreibung)
-AD_ACTIVITY_PATTERNS = (
-    "com.google.android.gms.ads",  # AdMob
-    "com.unity3d.services.ads",
-    "com.unity3d.ads",
-    "com.applovin",
-    "com.ironsource",
-    "com.vungle",
-    "com.liftoff",
-    "com.mbridge",  # Mintegral
-    "com.mintegral",
-    "com.bytedance.sdk.openadsdk",  # Pangle
-    "com.facebook.ads",
-    "com.chartboost",
-    "com.inmobi",
-    "com.fyber",
-    "com.adcolony",
-    "com.digitalturbine",
-    "com.moloco",
-    "com.bigossp",
-    "com.yandex.mobile.ads",
-    "adactivity",
-    "interstitial",
-    "rewarded",
-    "fullscreenad",
-)
 
 CLOSE_HINT = re.compile(r"close|skip|dismiss|schlie|überspring|×|✕|^x$", re.IGNORECASE)
 BOUNDS = re.compile(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")
@@ -78,13 +52,6 @@ def frame_difference(a: Image, b: Image) -> float:
     if a.shape != b.shape:
         return 255.0
     return float(np.abs(a.astype(np.int16) - b.astype(np.int16)).mean())
-
-
-def is_ad_activity(activity: str | None) -> bool:
-    if not activity:
-        return False
-    lowered = activity.lower()
-    return any(pattern in lowered for pattern in AD_ACTIVITY_PATTERNS)
 
 
 def classify(

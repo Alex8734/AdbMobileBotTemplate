@@ -45,6 +45,9 @@ class TemplateMeta(BaseModel):
     region: tuple[int, int, int, int] | None = None
     reference_resolution: tuple[int, int] | None = None
     mask: str | None = None
+    grayscale: bool = (
+        False  # in Graustufen matchen: ~3x schneller, gut für helle Symbole auf wechselndem Grund
+    )
 
     @classmethod
     def load(cls, path: Path) -> TemplateMeta:
@@ -60,9 +63,12 @@ class TemplateVariant:
     mask: Image | None  # 1 Kanal, Werte 0/1, gleiche Größe wie image
     source: Path | None
     flat: bool  # einfarbig (innerhalb der Maske) → eigenes Matching-Verfahren
+    gray: Image | None = None  # gesetzt, wenn in Graustufen gematcht wird
 
     @classmethod
-    def create(cls, image: Image, mask: Image | None = None, source: Path | None = None) -> TemplateVariant:
+    def create(
+        cls, image: Image, mask: Image | None = None, source: Path | None = None, *, grayscale: bool = False
+    ) -> TemplateVariant:
         if mask is not None:
             if mask.shape[:2] != image.shape[:2]:
                 raise TemplateError(f"{source}: Maske hat eine andere Größe als das Template")
@@ -72,7 +78,8 @@ class TemplateVariant:
             pixels = image[mask.astype(bool)]
         else:
             pixels = image.reshape(-1, 3)
-        return cls(image, mask, source, flat=bool(pixels.std(axis=0).max() < 1.0))
+        gray = np.asarray(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), dtype=np.uint8) if grayscale else None
+        return cls(image, mask, source, flat=bool(pixels.std(axis=0).max() < 1.0), gray=gray)
 
     @property
     def size(self) -> Size:
@@ -97,9 +104,10 @@ class Template:
         mask: Image | None = None,
         threshold: float | None = None,
         region: Rect | None = None,
+        grayscale: bool = False,
     ) -> Template:
         """Ad-hoc-Template ohne Datei (Tests, Werkzeuge)."""
-        return cls(name, (TemplateVariant.create(image, mask),), threshold, region)
+        return cls(name, (TemplateVariant.create(image, mask, grayscale=grayscale),), threshold, region)
 
 
 class TemplateStore:
@@ -275,7 +283,7 @@ class TemplateStore:
             if mask is not None:
                 mask = np.asarray(cv2.resize(mask, size, interpolation=cv2.INTER_NEAREST), dtype=np.uint8)
 
-        return TemplateVariant.create(image, mask, path)
+        return TemplateVariant.create(image, mask, path, grayscale=meta.grayscale)
 
 
 def _decode(path: Path, flags: int) -> Image:

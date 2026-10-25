@@ -118,3 +118,21 @@ def test_pause_duration_extends_deadline(fake_clock: FakeClock) -> None:
 
     assert outcome == [None]  # kein StepTimeout nach dem Fortsetzen
     assert control.deadline == pytest.approx(100 + 10 + 60)
+
+
+def test_deadline_paused_shifts_deadline(fake_clock: FakeClock) -> None:
+    control = RunControl(fake_clock)
+    control.set_deadline(fake_clock.monotonic() + 5)
+    with control.deadline_paused():
+        fake_clock.advance(60)  # z. B. ein Watcher drückt eine Werbung weg
+        control.checkpoint()  # keine Deadline im Block
+    fake_clock.advance(4.9)
+    control.checkpoint()
+    fake_clock.advance(0.2)
+    with pytest.raises(StepTimeout):
+        control.checkpoint()
+
+    control.set_deadline(None)
+    with control.deadline_paused():
+        fake_clock.advance(1)
+    assert control.deadline is None

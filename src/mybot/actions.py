@@ -9,7 +9,7 @@ from adbbot.bot.actions import action
 from adbbot.bot.context import BotContext
 from adbbot.bot.foreground import FOREGROUND_GROUP
 from adbbot.utils.paths import screenshots_dir
-from mybot.ads import dismiss_ad
+from mybot.ads import dismiss_ad, watch_reward_ad
 from mybot.pages.home_page import HomePage
 
 
@@ -53,4 +53,13 @@ def test_dismiss_ad(ctx: BotContext) -> None:
         )
     with ctx.suspend_watchers(FOREGROUND_GROUP) if guard_off else nullcontext():
         closed = dismiss_ad(ctx)
+    log.info("Ergebnis", geschlossen=closed, app=ctx.device.current_app())
+
+
+@action("Bonus-Werbung abwarten (Test)", group="Test", shortcut="F9")
+def test_reward_ad(ctx: BotContext) -> None:
+    """Bonus-Werbung von Hand starten, dann F9: wartet Timer/Leiste ab und schließt erst danach."""
+    log = ctx.log.bind(source="action")
+    log.info("Bonus-Werbung abwarten", app=ctx.device.current_app(), activity=ctx.device.current_activity())
+    closed = watch_reward_ad(ctx, None)
     log.info("Ergebnis", geschlossen=closed, app=ctx.device.current_app())

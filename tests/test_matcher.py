@@ -106,6 +106,41 @@ def test_mask_ignores_changed_pixels(matcher: TemplateMatcher, button: np.ndarra
     assert plain.confidence < masked.confidence
 
 
+def test_masked_template_ignores_flat_screen_areas(matcher: TemplateMatcher) -> None:
+    """Einfarbige Fenster liefern bei maskiertem CCOEFF Rechenmüll (> 1) – das darf kein Treffer sein.
+
+    Echtes Werbe-X: auf schwarzem Rand ergab es vorher Confidence 1.0.
+    """
+    store = TemplateStore(Path(__file__).resolve().parents[1] / "assets" / "templates")
+    template = store.get("ads/close_x_left")
+    glyph = template.variants[0].image
+
+    screen = np.zeros((350, 250, 3), dtype=np.uint8)  # schwarzer Rand über dunkelgrauer Werbung
+    screen[126:] = 30
+    best = matcher.best(screen, template, region=Rect(0, 0, 250, 350))
+    assert best is None or best.confidence < 0.85
+
+    screen[200:] = (90, 100, 95)
+    with_glyph = paste(screen, glyph, Point(120, 250))
+    found = matcher.find(with_glyph, template, region=Rect(0, 0, 250, 350))
+    assert found is not None
+    assert found.rect == Rect(120, 250, *glyph.shape[1::-1])
+
+
+def test_grayscale_matching(matcher: TemplateMatcher, screen: np.ndarray, button: np.ndarray) -> None:
+    mask = np.ones((40, 60), dtype=np.uint8)
+    for template in (
+        Template.from_image("gray", button, grayscale=True),
+        Template.from_image("gray_masked", button, mask=mask, grayscale=True),
+    ):
+        found = matcher.find(screen, template)
+        assert found is not None
+        assert found.rect == Rect(100, 300, 60, 40)
+        assert found.confidence > 0.99
+    other = Template.from_image("other", textured(60, 40, seed=99), grayscale=True)
+    assert matcher.find(screen, other) is None
+
+
 def test_flat_templates(matcher: TemplateMatcher) -> None:
     screen = paste(textured(360, 640, seed=1), solid_patch(30, 30, (0, 0, 255)), Point(50, 50))
     red = matcher.find(screen, Template.from_image("red", solid_patch(20, 20, (0, 0, 255))))

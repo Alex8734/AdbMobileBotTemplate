@@ -3,6 +3,9 @@
 - Normalfall: `TM_CCOEFF_NORMED` (robust gegen Helligkeitsunterschiede), optional mit Maske.
 - Einfarbige Templates haben keine Varianz, dort liefert CCOEFF nur NaN. Für sie wird die
   quadratische Abweichung in eine Ähnlichkeit 0..1 umgerechnet.
+- Templates mit `grayscale` (Template-JSON) werden in Graustufen gematcht – etwa 3x schneller.
+- Einfarbige Bildbereiche (z. B. schwarzer Rand) haben ebenfalls keine Varianz. Mit Maske liefert OpenCV
+  dort keine NaN, sondern Rechenmüll (auch Werte > 1) – solche Positionen zählen als 0.
 
 Ein Template mit mehreren Varianten liefert das Ergebnis der besten Variante.
 """
@@ -130,13 +133,32 @@ class TemplateMatcher:
                 diff = cv2.matchTemplate(area, tpl, cv2.TM_SQDIFF, mask=mask)
                 n = int(np.count_nonzero(mask))
             scores = 1.0 - np.sqrt(np.maximum(diff, 0.0) / (n * 3 * 255.0**2))
-        elif mask is None:
-            scores = cv2.matchTemplate(area, tpl, cv2.TM_CCOEFF_NORMED)
         else:
+            if variant.gray is not None:
+                area, tpl = np.asarray(cv2.cvtColor(area, cv2.COLOR_BGR2GRAY), dtype=np.uint8), variant.gray
             scores = cv2.matchTemplate(area, tpl, cv2.TM_CCOEFF_NORMED, mask=mask)
 
         result = np.nan_to_num(np.asarray(scores, dtype=np.float32), nan=0.0, posinf=0.0, neginf=0.0)
+        if not variant.flat:
+            result[_flat_windows(area, variant.size) | (result > 1.0 + 1e-3)] = 0.0
         return np.clip(result, -1.0, 1.0, out=result)
+
+
+def _flat_windows(area: Image, size: Size, min_std: float = 1.0) -> npt.NDArray[np.bool_]:
+    """Pro Template-Position: ist das Bildfenster praktisch einfarbig? (Graustufen, über Integralbilder)"""
+    gray = cv2.cvtColor(area, cv2.COLOR_BGR2GRAY) if area.ndim == 3 else area
+    sums, sums_sq = cv2.integral2(gray, sdepth=cv2.CV_64F)
+    total = np.asarray(sums, dtype=np.float64)
+    total_sq = np.asarray(sums_sq, dtype=np.float64)
+    h, w = size.h, size.w
+
+    def window(integral: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+        return integral[h:, w:] - integral[:-h, w:] - integral[h:, :-w] + integral[:-h, :-w]
+
+    n = float(w * h)
+    mean = window(total) / n
+    variance = window(total_sq) / n - mean * mean
+    return np.asarray(variance < min_std * min_std)
 
 
 def _peaks(scores: ScoreMap, threshold: float, search: Rect, size: Size, label: str) -> list[Match]:

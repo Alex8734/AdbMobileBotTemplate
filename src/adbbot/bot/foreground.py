@@ -73,7 +73,8 @@ class ForegroundGuard:
         self._log.warning("App verlassen – hole sie zurück", watcher=TITLE, current=current)
         self._active = True
         try:
-            self._bring_back(app.package, app.start_timeout_s)
+            with self.ctx.control.deadline_paused():
+                self._bring_back(app.package, app.start_timeout_s)
         finally:
             self._active = False
         return True

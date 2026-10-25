@@ -146,3 +146,12 @@ def test_from_image() -> None:
     assert tpl.variants[0].source is None
     with pytest.raises(TemplateError, match="leer"):
         Template.from_image("x", textured(10, 10, seed=1), mask=np.zeros((10, 10), dtype=np.uint8))
+
+
+def test_grayscale_from_json(root: Path) -> None:
+    (root / "common" / "star.json").write_text(json.dumps({"grayscale": True}), encoding="utf-8")
+    store = TemplateStore(root)
+    variant = store.get("common/star").variants[0]
+    assert variant.gray is not None
+    assert variant.gray.shape == variant.image.shape[:2]
+    assert store.get("home/shop_button").variants[0].gray is None

@@ -1,4 +1,5 @@
 {
   "reference_resolution": [1080, 2412],
-  "region": [820, 230, 260, 520]
+  "region": [820, 100, 260, 650],
+  "grayscale": true
 }

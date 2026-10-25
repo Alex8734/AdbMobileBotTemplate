@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from enum import Enum, auto
 
 from adbbot.core.clock import Clock
@@ -68,6 +69,18 @@ class RunControl:
     def set_deadline(self, monotonic_ts: float | None) -> None:
         with self._cond:
             self._deadline = monotonic_ts
+
+    @contextmanager
+    def deadline_paused(self) -> Iterator[None]:
+        """Zeit im Block zählt nicht zum Step-Timeout – z. B. während ein Watcher eine Werbung wegdrückt."""
+        with self._cond:
+            deadline, self._deadline = self._deadline, None
+        started = self._clock.monotonic()
+        try:
+            yield
+        finally:
+            if deadline is not None:
+                self.set_deadline(deadline + self._clock.monotonic() - started)
 
     @property
     def stop_requested(self) -> bool:

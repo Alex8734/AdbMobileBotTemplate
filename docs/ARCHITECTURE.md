@@ -523,9 +523,14 @@ desselben Templates geladen (z. B. Button im gedrückten/ungedrückten Zustand, 
   "threshold": 0.88,
   "region": [0, 1500, 1080, 420],
   "reference_resolution": [1080, 1920],
-  "mask": "shop_button_mask.png"
+  "mask": "shop_button_mask.png",
+  "grayscale": false
 }
 ```
+
+`grayscale: true` matcht in Graustufen – etwa 3x schneller und für helle Symbole auf wechselndem
+Hintergrund (X, ▶|) sogar trennschärfer. Einfarbige Bildbereiche zählen nie als Treffer: maskiertes
+`TM_CCOEFF_NORMED` liefert dort sonst Rechenmüll (Werte > 1).
 
 `TemplateStore` lädt lazy, cached als numpy, indexiert nach `"<page>/<name>"`.
 `TemplateStore.validate(names)` prüft beim Start, dass alle von Pages/Elementen/Watchern referenzierten
@@ -782,6 +787,11 @@ def dismiss_rating(ctx: BotContext, match: Match) -> None:
   with ctx.suspend_watchers("ads"):
       ...  # Werbung abwarten
   ```
+- bestätigt Treffer optional über `confirm(ctx, match)` – z. B. über die Activity, damit ein X der App selbst
+  nicht für eine Werbung gehalten wird;
+- pausiert während des Handlers die Step-Deadline (`control.deadline_paused()`): Eine 60-s-Werbung, die ein
+  Watcher wegdrückt, lässt den unterbrochenen Step nicht in den Timeout laufen. Gilt auch für den
+  Vordergrund-Wächter.
 
 #### Vordergrund-Wächter – App zurückholen
 

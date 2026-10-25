@@ -9,6 +9,10 @@ Watcher mit `group` lassen sich zeitweise abschalten, z. B. während der Bot sel
     with ctx.suspend_watchers("ads"):
         ...
 
+Mit `confirm` lässt sich ein Treffer zusätzlich bestätigen, bevor der Handler läuft – etwa über die
+Activity, wenn ein Symbol auch in der App selbst vorkommen könnte. Die Zeit im Handler zählt nicht zum
+Step-Timeout.
+
 Die Engine prüft sie über `vision.poll_hook` auf jedem Frame der Warteschleifen – ohne Extra-Screenshot.
 """
 
@@ -28,6 +32,7 @@ if TYPE_CHECKING:
 WATCHER_ATTR = "__adbbot_watcher__"
 
 type WatcherFunc = Callable[[BotContext, Match], None]
+type WatcherConfirm = Callable[[BotContext, Match], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +46,7 @@ class WatcherSpec:
     cooldown_s: float = 2.0  # frühestens nach dieser Zeit erneut auslösen
     idle: bool = False  # auch ohne laufenden Flow prüfen (braucht Idle-Livebild)
     group: str | None = None  # über `ctx.suspend_watchers(group)` abschaltbar
+    confirm: WatcherConfirm | None = None  # nach dem Template-Treffer: wirklich auslösen?
 
     @property
     def key(self) -> str:
@@ -57,13 +63,16 @@ def watcher(
     cooldown_s: float = 2.0,
     idle: bool = False,
     group: str | None = None,
+    confirm: WatcherConfirm | None = None,
 ) -> Callable[[WatcherFunc], WatcherFunc]:
     templates = (template,) if isinstance(template, str) else tuple(template)
     if not templates:
         raise ValueError("Watcher braucht mindestens ein Template")
 
     def decorate(func: WatcherFunc) -> WatcherFunc:
-        spec = WatcherSpec(title, func, templates, region, threshold, priority, cooldown_s, idle, group)
+        spec = WatcherSpec(
+            title, func, templates, region, threshold, priority, cooldown_s, idle, group, confirm
+        )
         setattr(func, WATCHER_ATTR, spec)
         return func
 
@@ -133,6 +142,9 @@ class WatcherRunner:
             match = self._find(spec, frame)
             if match is None:
                 continue
+            if spec.confirm is not None and not spec.confirm(self.ctx, match):
+                self._log.debug("Treffer nicht bestätigt", watcher=spec.title)
+                continue
 
             self._step_triggers += 1
             if flow_running and self._step_triggers > self.max_triggers_per_step:
@@ -148,7 +160,8 @@ class WatcherRunner:
             self._log.info("Watcher ausgelöst", watcher=spec.title, confidence=round(match.confidence, 3))
             self._active = True
             try:
-                spec.func(self.ctx, match)
+                with self.ctx.control.deadline_paused():
+                    spec.func(self.ctx, match)
             finally:
                 self._active = False
             return True

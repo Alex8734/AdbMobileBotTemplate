@@ -166,3 +166,35 @@ def test_group_can_be_suspended(ctx: BotContext) -> None:
     assert calls == []
     assert r.run(frame, flow_running=True)
     assert calls == ["ad"]
+
+
+def test_confirm_can_reject_a_match(ctx: BotContext) -> None:
+    calls: list[str] = []
+    answers = [False, True]
+    seen: list[Match] = []
+
+    def confirm(c: BotContext, match: Match) -> bool:
+        seen.append(match)
+        return answers.pop(0)
+
+    r = runner(ctx, make_spec("ad", calls, confirm=confirm))
+    frame = ctx.vision.capture()
+    assert not r.run(frame, flow_running=True)
+    assert r.run(frame, flow_running=True)
+    assert calls == ["ad"]
+    assert seen[0].label == "common/popup"
+
+
+def test_handler_time_does_not_count_for_step_timeout(ctx: BotContext, fake_clock: FakeClock) -> None:
+    @watcher("langsam", template="common/popup", cooldown_s=0)
+    def slow(c: BotContext, match: Match) -> None:
+        c.sleep(60)
+
+    spec = get_watcher_spec(slow)
+    assert spec is not None
+    ctx.control.set_deadline(fake_clock.monotonic() + 5)
+    assert runner(ctx, spec).run(ctx.vision.capture(), flow_running=True)
+    ctx.checkpoint()  # ohne Pause wäre die Deadline längst überschritten
+    deadline = ctx.control.deadline
+    assert deadline is not None
+    assert deadline - fake_clock.monotonic() == pytest.approx(5, abs=0.2)
