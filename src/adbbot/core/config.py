@@ -45,6 +45,13 @@ class DeviceConfig(_Model):
     reconnect_delay_s: float = Field(default=1.0, gt=0)  # erster Abstand zwischen Reconnect-Versuchen
     reconnect_max_delay_s: float = Field(default=30.0, gt=0)  # Backoff-Obergrenze
     health_check_interval_s: float = Field(default=5.0, gt=0)  # Verbindungsprüfung ohne Livebild
+    # Screenshots: scrcpy-Videostream (~30 Bilder/s) statt screencap (~1 s pro Bild über USB).
+    # auto = Stream, wenn scrcpy installiert ist, sonst screencap
+    capture: Literal["auto", "scrcpy", "screencap"] = "auto"
+    scrcpy_server: Path | None = None  # None = neben `scrcpy` bzw. an den üblichen Orten suchen
+    scrcpy_version: str | None = None  # None = aus `scrcpy --version`
+    scrcpy_max_fps: int = Field(default=30, ge=1, le=120)
+    scrcpy_bit_rate: int = Field(default=8_000_000, gt=0)
 
 
 class VisionConfig(_Model):

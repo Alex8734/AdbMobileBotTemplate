@@ -47,7 +47,9 @@ def list_devices(host: str = "127.0.0.1", port: int = 5037, timeout_s: float = 5
     return result
 
 
-def create_device(config: DeviceConfig, clock: Clock, *, root: Path) -> DeviceProtocol:
+def create_device(
+    config: DeviceConfig, clock: Clock, *, root: Path, log: FilteringBoundLogger | None = None
+) -> DeviceProtocol:
     """Factory nach `device.backend`. Das Gerät ist danach noch nicht verbunden."""
     match config.backend:
         case "adb":
@@ -57,6 +59,12 @@ def create_device(config: DeviceConfig, clock: Clock, *, root: Path) -> DevicePr
                 host=config.adb_host,
                 port=config.adb_port,
                 command_timeout_s=config.command_timeout_s,
+                capture=config.capture,
+                scrcpy_server=resolve(config.scrcpy_server, root) if config.scrcpy_server else None,
+                scrcpy_version=config.scrcpy_version,
+                scrcpy_max_fps=config.scrcpy_max_fps,
+                scrcpy_bit_rate=config.scrcpy_bit_rate,
+                log=log.bind(source="device") if log else None,
             )
         case "fake":
             if config.fake_screens_dir is None:

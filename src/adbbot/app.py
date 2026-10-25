@@ -46,8 +46,9 @@ def build_device(
     root: Path,
     sleep: Callable[[float], None] | None = None,
     rng: random.Random | None = None,
+    log: FilteringBoundLogger | None = None,
 ) -> DeviceProtocol:
-    device = create_device(config.device, clock, root=root)
+    device = create_device(config.device, clock, root=root, log=log)
     return humanize(device, config.bot, sleep=sleep or clock.sleep, rng=rng)
 
 
@@ -67,7 +68,7 @@ def build_context(
     rng = rng or random.Random()
     log = log or create_logger(level=config.log_level, bus=bus, log_file=_log_file(config, root))
     control = RunControl(clock)
-    device = device or build_device(config, clock, root=root, sleep=control.sleep, rng=rng)
+    device = device or build_device(config, clock, root=root, sleep=control.sleep, rng=rng, log=log)
     vision = Vision.from_config(config, device, clock=clock, root=root, bus=bus, log=log)
     failures = (
         FailureRecorder(vision, bus, paths.failures_dir(root)) if config.bot.failure_snapshots else None

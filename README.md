@@ -10,6 +10,8 @@ sich alles ohne Handy entwickeln und testen lässt.
 ## Schnellstart
 
 Voraussetzungen: Python 3.12, [uv](https://docs.astral.sh/uv/), für echte Geräte `adb` im `PATH`.
+Empfohlen: [scrcpy](https://github.com/Genymobile/scrcpy) ≥ 2.0 installieren – dann kommen Screenshots als
+Videostream (~1 ms statt ~1 s pro Bild). Ohne scrcpy wird automatisch `screencap` benutzt.
 
 ```bash
 uv sync                          # optional: uv sync --extra ocr   (RapidOCR für read_text/read_number)
@@ -36,7 +38,7 @@ uv run mybot --profile example                 # config/profiles/example.yaml an
 
 | Bereich | Kurz |
 |---|---|
-| **Device** | `adbutils`-Backend mit Timeouts, humanisierte Eingaben, Fake-Gerät mit `scenario.yaml` (Tap → Screen) |
+| **Device** | `adbutils`-Backend mit Timeouts, scrcpy-Bildschirmstream, humanisierte Eingaben, Fake-Gerät mit `scenario.yaml` (Tap → Screen) |
 | **Vision** | Template-Store (Varianten `name@2.png`, Masken, JSON-Metadaten, Validierung beim Start), Matching, Farbe, OCR, automatische Overlays |
 | **Bot** | Pages mit Elementen, Flows mit `@step` (Retry, Skip, Timeout, optional), Watcher für Popups, Actions, Navigator, persistenter Storage, Fehler-Snapshots |
 | **Engine** | Ein Bot-Thread, Pause/Stop sofort wirksam, Auto-Reconnect mit Backoff |

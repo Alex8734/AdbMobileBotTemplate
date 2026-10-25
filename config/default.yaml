@@ -8,6 +8,7 @@ device:
   command_timeout_s: 10.0
   connect_attempts: 3
   reference_resolution: [1080, 1920]
+  capture: auto        # auto = scrcpy-Videostream, falls installiert (~1 ms/Bild), sonst screencap (~1 s)
 
 vision:
   default_threshold: 0.85

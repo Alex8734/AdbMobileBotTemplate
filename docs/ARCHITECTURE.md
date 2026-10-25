@@ -504,6 +504,11 @@ class DeviceProtocol(Protocol):
 
 - **`AdbDevice`** (adbutils). Jeder Aufruf hat ein Timeout (`command_timeout_s`) und wirft `DeviceError`,
   damit ein hängendes `adb` den Bot-Thread nicht dauerhaft blockiert und Stop wirksam bleibt.
+  Screenshots kommen bei `device.capture: auto` (Default) aus einem **scrcpy-Videostream**
+  (`device/scrcpy_stream.py`): Der Server der installierten scrcpy-Version läuft auf dem Gerät, H.264 wird mit
+  PyAV dekodiert, ein Lese-Thread hält das neueste Bild bereit. Ein Screenshot kostet so ~1 ms statt ~1–2 s
+  (`screencap` überträgt 10 MB pro Bild über USB). Ohne scrcpy oder bei Fehlern: `screencap`, Hinweis im Log.
+  Der Encoder rundet auf Vielfache von 8 (2412 → 2408); das Bild wird auf die echte Größe zurückskaliert.
 - **`SubprocessDevice`**: `adb -s X exec-out screencap -p` / `adb shell input ...`. Langsamer, ohne Zusatzpaket.
 - **`FakeDevice`**: liefert Frames aus einem Ordner (sequenziell oder per Skript `name → Frame`), loggt alle Inputs
   in eine Liste (`device.inputs`), die Tests prüfen können. Damit lassen sich Flows ohne Handy entwickeln und testen.
@@ -1068,8 +1073,8 @@ Jede Phase ist für sich lauffähig und testbar.
 
 Umsetzungsnotizen Phase 1:
 - `utils/image.py` ist die einzige `cv2`-Nutzung außerhalb von `vision/` – nur Datei-I/O (PNG lesen/schreiben).
-- `AdbDevice.screenshot()` nutzt rohes `screencap` (kein PNG-Encoding auf dem Gerät) und fällt bei
-  unlesbaren Daten automatisch auf `screencap -p` zurück.
+- `AdbDevice.screenshot()` nutzt den scrcpy-Stream (`device.capture`), sonst rohes `screencap` (kein
+  PNG-Encoding auf dem Gerät) und fällt bei unlesbaren Daten automatisch auf `screencap -p` zurück.
 - `RunControl` schlägt die Pausendauer auf die Step-Deadline auf; `on_pause_changed` meldet echtes Blockieren.
 - Zusätzliche Config-Felder: `device.adb_host/adb_port/connect_attempts`, `bot.tap_jitter_px`, `log_file`.
 - Swipe-Kurven (humanize) sind noch linear; echte Kurven bräuchten `input motionevent` (Android 11+).

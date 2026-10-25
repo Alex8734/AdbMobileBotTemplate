@@ -5,6 +5,7 @@ description = "Template für ADB-basierte Android-Bots: Framework (adbbot) + Bei
 requires-python = ">=3.12"
 dependencies = [
     "adbutils>=2.8",
+    "av>=12",  # H.264-Dekoder für den scrcpy-Bildschirmstream
     "opencv-python-headless>=4.10",
     "numpy>=2.0",
     "PySide6>=6.7",
